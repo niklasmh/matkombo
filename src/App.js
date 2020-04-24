@@ -72,23 +72,34 @@ function Lists({ container }) {
       setFoodComboLists([foodCombinations]);
       setFoodLists([foods]);
     }
-  }, [combos]);
+  }, [combos, foodLists]);
 
   function addCombination(combo, description = "", tags = "") {
-    combosRef.doc(combo.sort().join(" + ").toLowerCase()).set(
-      {
-        ...(description && { description }),
-        ...(tags && { tags }),
-      },
-      { merge: true }
-    );
+    const distinctCombos = removeDuplicates(combo);
+    if (distinctCombos.length > 1) {
+      combosRef.doc(distinctCombos.sort().join(" + ").toLowerCase()).set(
+        {
+          ...(description && { description }),
+          ...(tags && { tags }),
+        },
+        { merge: true }
+      );
+    } else {
+      window.alert(
+        "Du må ha flere forskjellige kombinasjoner. F.eks.: Is og sjokolade"
+      );
+    }
+  }
+
+  function removeDuplicates(array) {
+    return [...new Set(array)];
   }
 
   // eslint-disable-next-line
   function updateDatabaseWithLocal() {
     foodCombinationsLocal.forEach(
       ([{ description = "", tags = [] }, ...comb]) => {
-        addCombination(comb, description, tags.join(" "));
+        addCombination(removeDuplicates(comb), description, tags.join(" "));
       }
     );
   }
@@ -125,6 +136,7 @@ function Lists({ container }) {
         {[...combo, "all"].map((_, i) => {
           return foodLists.length > i ? (
             <Level
+              key={i}
               level={i}
               filters={filters}
               foodLists={foodLists}
@@ -160,6 +172,23 @@ function Level({
   setFilters,
 }) {
   const fieldRef = useRef(null);
+
+  function getUserCombo(text, ifempty = "") {
+    const answer = window.prompt(
+      text + ' (Bruk "og" mellom hver kombinasjon for å kombinere flere)'
+    );
+    if (ifempty && answer === "") {
+      window.alert(ifempty);
+    }
+    if (answer !== null) {
+      const combo = answer
+        .split(" og ")
+        .map((a) => a.trim())
+        .filter((a) => a);
+      return [...new Set(combo)];
+    }
+    return null;
+  }
 
   return (
     <div key={i} className="Level">
@@ -231,25 +260,36 @@ function Level({
           className="Item AddItem"
           onClick={() => {
             if (filters[i]) {
-              addCombination([...combo, filters[i]]);
+              if (i === 0) {
+                const additionalAnswer = getUserCombo(
+                  `Du må også kombinere "${filters[i]}" med noe annet:`,
+                  "Du må ha flere kombinasjoner. F.eks.: Is og sjokolade"
+                );
+                if (additionalAnswer !== null && additionalAnswer.length) {
+                  addCombination([...combo, filters[i], ...additionalAnswer]);
+                }
+              } else {
+                addCombination([...combo, filters[i]]);
+              }
             } else {
-              const answer = window.prompt(
-                `Sett navn på mat som du mener kan kombineres med ${combo.join(
-                  " og "
-                )}: (Bruk "og" mellom hver kombinasjon for å kombinere flere)`
+              const answer = getUserCombo(
+                i === 0
+                  ? "Sett navn på minst to matkombinasjoner som du mener kan kombineres:"
+                  : `Sett navn på mat som du mener kan kombineres med "${combo.join(
+                      '" og "'
+                    )}":`,
+                "Du må ha flere kombinasjoner. F.eks.: Is og sjokolade"
               );
-              if (answer) {
-                const answerArray = answer
-                  .split(" og ")
-                  .map((a) => a.trim())
-                  .filter((a) => a);
-                if (answerArray.length) {
-                  addCombination([...combo, ...answerArray]);
-                  if (i === 0 && answerArray.length === 1) {
-                    window.prompt(
-                      `Du må minst kombinere med en til med ${answerArray[0]}: (Bruk "og" mellom hver kombinasjon for å kombinere flere)`
-                    );
-                  }
+              if (answer !== null && answer.length) {
+                if (i === 0 && answer.length === 1) {
+                  const additionalAnswer = getUserCombo(
+                    `Du må minst kombinere med en til med "${answer[0]}":`,
+                    "Du må ha flere kombinasjoner. F.eks.: Is og sjokolade"
+                  );
+                  if (additionalAnswer !== null && additionalAnswer.length)
+                    addCombination([...combo, ...answer, ...additionalAnswer]);
+                } else {
+                  addCombination([...combo, ...answer]);
                 }
               }
             }
