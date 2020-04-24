@@ -227,33 +227,45 @@ function Level({
               />
             </div>
           ))}
-        {i > 0 ? (
-          <div
-            className="Item AddItem"
-            onClick={() => {
-              if (filters[i]) {
-                addCombination([...combo, filters[i]]);
-              } else {
-                const answer = window.prompt(
-                  `Sett navn på mat som du mener kan kombineres med ${combo.join(
-                    " og "
-                  )}`
-                );
-                if (answer) addCombination([...combo, answer]);
+        <div
+          className="Item AddItem"
+          onClick={() => {
+            if (filters[i]) {
+              addCombination([...combo, filters[i]]);
+            } else {
+              const answer = window.prompt(
+                `Sett navn på mat som du mener kan kombineres med ${combo.join(
+                  " og "
+                )}: (Bruk "og" mellom hver kombinasjon for å kombinere flere)`
+              );
+              if (answer) {
+                const answerArray = answer
+                  .split(" og ")
+                  .map((a) => a.trim())
+                  .filter((a) => a);
+                if (answerArray.length) {
+                  addCombination([...combo, ...answerArray]);
+                  if (i === 0 && answerArray.length === 1) {
+                    window.prompt(
+                      `Du må minst kombinere med en til med ${answerArray[0]}: (Bruk "og" mellom hver kombinasjon for å kombinere flere)`
+                    );
+                  }
+                }
               }
-            }}
-          >
-            + Legg til{" "}
-            {filters[i] ? `"${filters[i].toLowerCase()}"` : "en ny kombinasjon"}
-          </div>
-        ) : (
+            }
+          }}
+        >
+          + Legg til{" "}
+          {filters[i] ? `"${filters[i].toLowerCase()}"` : "en ny kombinasjon"}
+        </div>
+        {i === 0 ? (
           <div
             className="Item AddItem"
             onClick={() => downloadDatabaseContent()}
           >
             Last ned alle kombinasjoner ↓
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
