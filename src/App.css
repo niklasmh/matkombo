@@ -31,7 +31,7 @@
 .List {
   display: flex;
   flex-direction: column;
-  flex: 1 0 calc(100vh - 6.9em - 64px);
+  flex: 1 0 calc(100vh - 6.9em - 78px);
   overflow-y: auto;
 }
 
@@ -39,8 +39,7 @@
   transition: background-color 0.2s;
   border-radius: 8px;
   padding: 0.3em 0.5em;
-  text-transform: capitalize;
-  max-width: 300px;
+  max-width: 292px;
   width: 100%;
   margin: 4px auto;
   display: flex;
@@ -49,12 +48,20 @@
   cursor: pointer;
 }
 
+.Item > span:first-letter {
+  text-transform: uppercase;
+}
+
 .Item:hover {
   background: #fff2;
 }
 
 .Item.selected {
   background: #fff3;
+}
+
+.AddItem {
+  font-size: 0.8em;
 }
 
 .more::after {
@@ -132,11 +139,23 @@ input::placeholder {
   color: #fffd;
 }
 
-h1 {
+.Title,
+.Combo {
   position: fixed;
   text-align: left;
-  margin-left: 1.4em;
+  margin-left: 50px;
   z-index: 2;
+}
+
+.Combo {
+  margin-top: 112px;
+  font-size: 16px;
+  margin-left: 64px;
+  font-weight: normal;
+}
+
+.Combo::first-letter {
+  text-transform: uppercase;
 }
 
 ::-webkit-scrollbar {

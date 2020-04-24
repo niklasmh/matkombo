@@ -1,19 +1,128 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  FirebaseAppProvider,
+  useFirestoreCollectionData,
+  useFirestore,
+  SuspenseWithPerf,
+} from "reactfire";
 import "./App.css";
-import { foodCombinations, foods } from "./combinations";
+import { foodCombinations as foodCombinationsLocal } from "./combinations";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBPXNPvR_quFgYLxwf3pPnvv_8PqTTQFLo",
+  authDomain: "matkomboapp.firebaseapp.com",
+  databaseURL: "https://matkomboapp.firebaseio.com",
+  projectId: "matkomboapp",
+  storageBucket: "matkomboapp.appspot.com",
+  messagingSenderId: "354610688205",
+  appId: "1:354610688205:web:196e74f763a2f9f9a2b984",
+  measurementId: "G-PM9FLJS69L",
+};
 
 function App() {
-  const [combo, setCombo] = useState([]);
-  const [foodLists, setFoodLists] = useState([foods]);
-  const [foodComboLists, setFoodComboLists] = useState([foodCombinations]);
-  const [filters, setFilters] = useState([""]);
+  const appContainer = useRef(null);
 
   return (
-    <div className="App">
-      <h1>Matkombo</h1>
+    <FirebaseAppProvider firebaseConfig={firebaseConfig}>
+      <div className="App" ref={appContainer}>
+        <h1 className="Title">Matkombo</h1>
+        <SuspenseWithPerf
+          fallback={
+            <div className="Lists">
+              <div className="Level">Henter matkombinasjoner ...</div>
+            </div>
+          }
+          traceId={"load-combo-list"}
+        >
+          <Lists container={appContainer} />
+        </SuspenseWithPerf>
+      </div>
+    </FirebaseAppProvider>
+  );
+}
+
+export default App;
+
+function Lists({ container }) {
+  const [combo, setCombo] = useState([]);
+  const [foodLists, setFoodLists] = useState([]);
+  const [foodComboLists, setFoodComboLists] = useState([]);
+  const [filters, setFilters] = useState([""]);
+
+  const combosRef = useFirestore().collection("combos");
+  const combos = useFirestoreCollectionData(combosRef, { idField: "combo" });
+
+  useEffect(() => {
+    const foodCombinations = combos.map(
+      ({ combo, description = "", tags = "" }) => [
+        { description, tags: tags.split(" ").filter((e) => !!e) },
+        ...combo.split("+").map((e) => e.trim()),
+      ]
+    );
+    const foods = foodCombinations
+      .reduce(
+        (acc, n) => [
+          ...acc,
+          ...n.filter((e) => typeof e === "string" && !acc.includes(e)),
+        ],
+        []
+      )
+      .sort();
+
+    setFoodComboLists([foodCombinations]);
+    setFoodLists([foods]);
+  }, [combos]);
+
+  function addCombination(combo, description = "", tags = "") {
+    combosRef.doc(combo.sort().join(" + ").toLowerCase()).set(
+      {
+        ...(description && { description }),
+        ...(tags && { tags }),
+      },
+      { merge: true }
+    );
+  }
+
+  // eslint-disable-next-line
+  function updateDatabaseWithLocal() {
+    foodCombinationsLocal.forEach(
+      ([{ description = "", tags = [] }, ...comb]) => {
+        addCombination(comb, description, tags.join(" "));
+      }
+    );
+  }
+
+  function downloadDatabaseContent() {
+    const content = foodComboLists[0]
+      .map(
+        ([{ description = "", tags = [] }, ...combo]) =>
+          combo.join(" + ") +
+          (description || tags.length
+            ? " = " + description + tags.map((tag) => " #" + tag).join("")
+            : "")
+      )
+      .join("\n");
+    var element = document.createElement("a");
+    element.setAttribute(
+      "href",
+      "data:text/plain;charset=utf-8," + encodeURIComponent(content)
+    );
+    element.setAttribute("download", "matkombo.txt");
+    element.style.display = "none";
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  }
+
+  return (
+    <>
+      <h2 className="Combo">
+        {combo.map((c) => `"${c}"`).join(" og ") +
+          (combo.length === 1 ? " og ..." : "")}
+      </h2>
       <div className="Lists">
         {[...combo, "all"].map((selected, i) => {
-          return foodLists.length > i && foodLists[i].length ? (
+          return foodLists.length > i ? (
             <div key={i} className="Level">
               <div className="InputContainer">
                 <input
@@ -35,6 +144,8 @@ function App() {
                       "",
                       ...filters.slice(i + 1),
                     ]);
+                    downloadDatabaseContent();
+                    //updateDatabaseWithLocal();
                   }}
                 >
                   ×
@@ -71,6 +182,13 @@ function App() {
                               )
                           ),
                         ]);
+                        setTimeout(() => {
+                          try {
+                            if (container.current)
+                              container.current.scrollLeft =
+                                container.current.scrollWidth;
+                          } catch (ex) {}
+                        }, 10);
                       }}
                     >
                       <FoodItem
@@ -80,16 +198,36 @@ function App() {
                       />
                     </div>
                   ))}
+                {i > 0 ? (
+                  <div
+                    className="Item AddItem"
+                    onClick={() => {
+                      if (filters[i]) {
+                        addCombination([...combo, filters[i]]);
+                      } else {
+                        const answer = window.prompt(
+                          `Sett navn på mat som du mener kan kombineres med ${combo.join(
+                            " og "
+                          )}`
+                        );
+                        if (answer) addCombination([...combo, answer]);
+                      }
+                    }}
+                  >
+                    + Legg til{" "}
+                    {filters[i]
+                      ? `"${filters[i].toLowerCase()}"`
+                      : "en ny kombinasjon"}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null;
         })}
       </div>
-    </div>
+    </>
   );
 }
-
-export default App;
 
 function FoodItem({ level, food, foodComboList }) {
   if (level === 0) {
