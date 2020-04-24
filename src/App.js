@@ -53,24 +53,25 @@ function Lists({ container }) {
   const combos = useFirestoreCollectionData(combosRef, { idField: "combo" });
 
   useEffect(() => {
-    const foodCombinations = combos.map(
-      ({ combo, description = "", tags = "" }) => [
-        { description, tags: tags.split(" ").filter((e) => !!e) },
-        ...combo.split("+").map((e) => e.trim()),
-      ]
-    );
-    const foods = foodCombinations
-      .reduce(
-        (acc, n) => [
-          ...acc,
-          ...n.filter((e) => typeof e === "string" && !acc.includes(e)),
-        ],
-        []
-      )
-      .sort();
-
-    setFoodComboLists([foodCombinations]);
-    setFoodLists([foods]);
+    if (!foodLists.length) {
+      const foodCombinations = combos.map(
+        ({ combo, description = "", tags = "" }) => [
+          { description, tags: tags.split(" ").filter((e) => !!e) },
+          ...combo.split("+").map((e) => e.trim()),
+        ]
+      );
+      const foods = foodCombinations
+        .reduce(
+          (acc, n) => [
+            ...acc,
+            ...n.filter((e) => typeof e === "string" && !acc.includes(e)),
+          ],
+          []
+        )
+        .sort();
+      setFoodComboLists([foodCombinations]);
+      setFoodLists([foods]);
+    }
   }, [combos]);
 
   function addCombination(combo, description = "", tags = "") {
@@ -121,111 +122,140 @@ function Lists({ container }) {
           (combo.length === 1 ? " og ..." : "")}
       </h2>
       <div className="Lists">
-        {[...combo, "all"].map((selected, i) => {
+        {[...combo, "all"].map((_, i) => {
           return foodLists.length > i ? (
-            <div key={i} className="Level">
-              <div className="InputContainer">
-                <input
-                  placeholder="Filtrer ..."
-                  value={filters[i]}
-                  onChange={(e) =>
-                    setFilters([
-                      ...filters.slice(0, i),
-                      e.target.value || "",
-                      ...filters.slice(i + 1),
-                    ])
-                  }
-                />
-                <button
-                  className={"Reset" + (filters[i] ? "" : " hidden")}
-                  onClick={() => {
-                    setFilters([
-                      ...filters.slice(0, i),
-                      "",
-                      ...filters.slice(i + 1),
-                    ]);
-                    downloadDatabaseContent();
-                    //updateDatabaseWithLocal();
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-              <div className="List">
-                {foodLists[i]
-                  .filter(
-                    (food) => food.indexOf(filters[i].toLowerCase()) !== -1
-                  )
-                  .map((food) => (
-                    <div
-                      className={
-                        "Item" + (food === combo[i] ? " selected" : "")
-                      }
-                      key={food}
-                      onClick={() => {
-                        setCombo([...combo.slice(0, i), food]);
-                        setFilters([...filters.slice(0, i + 1), ""]);
-                        const availableFoodCombinations = foodComboLists[
-                          i
-                        ].filter((fc) => fc.includes(food));
-                        setFoodComboLists([
-                          ...foodComboLists.slice(0, i + 1),
-                          availableFoodCombinations,
-                        ]);
-                        setFoodLists([
-                          ...foodLists.slice(0, i + 1),
-                          foodLists[i].filter(
-                            (f) =>
-                              f !== food &&
-                              availableFoodCombinations.some((fc) =>
-                                fc.includes(f)
-                              )
-                          ),
-                        ]);
-                        setTimeout(() => {
-                          try {
-                            if (container.current)
-                              container.current.scrollLeft =
-                                container.current.scrollWidth;
-                          } catch (ex) {}
-                        }, 10);
-                      }}
-                    >
-                      <FoodItem
-                        level={i}
-                        food={food}
-                        foodComboList={foodComboLists[i]}
-                      />
-                    </div>
-                  ))}
-                {i > 0 ? (
-                  <div
-                    className="Item AddItem"
-                    onClick={() => {
-                      if (filters[i]) {
-                        addCombination([...combo, filters[i]]);
-                      } else {
-                        const answer = window.prompt(
-                          `Sett navn på mat som du mener kan kombineres med ${combo.join(
-                            " og "
-                          )}`
-                        );
-                        if (answer) addCombination([...combo, answer]);
-                      }
-                    }}
-                  >
-                    + Legg til{" "}
-                    {filters[i]
-                      ? `"${filters[i].toLowerCase()}"`
-                      : "en ny kombinasjon"}
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            <Level
+              level={i}
+              filters={filters}
+              foodLists={foodLists}
+              foodComboLists={foodComboLists}
+              combo={combo}
+              container={container}
+              addCombination={addCombination}
+              downloadDatabaseContent={downloadDatabaseContent}
+              setCombo={setCombo}
+              setFoodLists={setFoodLists}
+              setFoodComboLists={setFoodComboLists}
+              setFilters={setFilters}
+            />
           ) : null;
         })}
       </div>
     </>
+  );
+}
+
+function Level({
+  level: i,
+  filters,
+  foodLists,
+  foodComboLists,
+  combo,
+  container,
+  addCombination,
+  downloadDatabaseContent,
+  setCombo,
+  setFoodLists,
+  setFoodComboLists,
+  setFilters,
+}) {
+  const fieldRef = useRef(null);
+
+  return (
+    <div key={i} className="Level">
+      <div className="InputContainer">
+        <input
+          ref={fieldRef}
+          placeholder="Filtrer ..."
+          value={filters[i]}
+          onChange={(e) =>
+            setFilters([
+              ...filters.slice(0, i),
+              e.target.value || "",
+              ...filters.slice(i + 1),
+            ])
+          }
+        />
+        <button
+          className={"Reset" + (filters[i] ? "" : " hidden")}
+          onClick={() => {
+            setFilters([...filters.slice(0, i), "", ...filters.slice(i + 1)]);
+            fieldRef.current.focus();
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <div className="List">
+        {foodLists[i]
+          .filter((food) => food.indexOf(filters[i].toLowerCase()) !== -1)
+          .map((food) => (
+            <div
+              className={"Item" + (food === combo[i] ? " selected" : "")}
+              key={food}
+              onClick={() => {
+                setCombo([...combo.slice(0, i), food]);
+                setFilters([...filters.slice(0, i + 1), ""]);
+                const availableFoodCombinations = foodComboLists[
+                  i
+                ].filter((fc) => fc.includes(food));
+                setFoodComboLists([
+                  ...foodComboLists.slice(0, i + 1),
+                  availableFoodCombinations,
+                ]);
+                setFoodLists([
+                  ...foodLists.slice(0, i + 1),
+                  foodLists[i].filter(
+                    (f) =>
+                      f !== food &&
+                      availableFoodCombinations.some((fc) => fc.includes(f))
+                  ),
+                ]);
+                setTimeout(() => {
+                  try {
+                    if (container.current)
+                      container.current.scrollLeft =
+                        container.current.scrollWidth;
+                  } catch (ex) {}
+                }, 10);
+              }}
+            >
+              <FoodItem
+                level={i}
+                food={food}
+                foodComboList={foodComboLists[i]}
+              />
+            </div>
+          ))}
+        {i > 0 ? (
+          <div
+            className="Item AddItem"
+            onClick={() => {
+              if (filters[i]) {
+                addCombination([...combo, filters[i]]);
+              } else {
+                const answer = window.prompt(
+                  `Sett navn på mat som du mener kan kombineres med ${combo.join(
+                    " og "
+                  )}`
+                );
+                if (answer) addCombination([...combo, answer]);
+              }
+            }}
+          >
+            + Legg til{" "}
+            {filters[i] ? `"${filters[i].toLowerCase()}"` : "en ny kombinasjon"}
+          </div>
+        ) : (
+          <div
+            className="Item AddItem"
+            onClick={() => downloadDatabaseContent()}
+          >
+            Last ned alle kombinasjoner ↓
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
