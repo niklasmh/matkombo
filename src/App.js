@@ -3,6 +3,7 @@ import {
   FirebaseAppProvider,
   useFirestoreCollectionData,
   useFirestore,
+  useAnalytics,
   SuspenseWithPerf,
 } from "reactfire";
 import "./App.css";
@@ -18,6 +19,9 @@ const firebaseConfig = {
   appId: "1:354610688205:web:196e74f763a2f9f9a2b984",
   measurementId: "G-PM9FLJS69L",
 };
+
+const localUpvotes = {};
+const localDownvotes = {};
 
 function App() {
   const appContainer = useRef(null);
@@ -49,14 +53,37 @@ function Lists({ container }) {
   const [foodComboLists, setFoodComboLists] = useState([]);
   const [filters, setFilters] = useState([""]);
 
+  useAnalytics();
+  const increment = useFirestore.FieldValue.increment(1);
   const combosRef = useFirestore().collection("combos");
   const combos = useFirestoreCollectionData(combosRef, { idField: "combo" });
+
+  function upvoteCombo(combo) {
+    const comboRef = combosRef.doc(combo.sort().join(" + ").toLowerCase());
+    comboRef.update({ upvotes: increment });
+  }
+
+  function downvoteCombo(combo) {
+    const comboRef = combosRef.doc(combo.sort().join(" + ").toLowerCase());
+    comboRef.update({ downvotes: increment });
+  }
 
   useEffect(() => {
     if (!foodLists.length) {
       const foodCombinations = combos.map(
-        ({ combo, description = "", tags = "" }) => [
-          { description, tags: tags.split(" ").filter((e) => !!e) },
+        ({
+          combo,
+          description = "",
+          tags = "",
+          upvotes = 0,
+          downvotes = 0,
+        }) => [
+          {
+            description,
+            tags: tags.split(" ").filter((e) => !!e),
+            upvotes,
+            downvotes,
+          },
           ...combo.split("+").map((e) => e.trim()),
         ]
       );
@@ -149,6 +176,8 @@ function Lists({ container }) {
               setFoodLists={setFoodLists}
               setFoodComboLists={setFoodComboLists}
               setFilters={setFilters}
+              upvoteCombo={upvoteCombo}
+              downvoteCombo={downvoteCombo}
             />
           ) : null;
         })}
@@ -170,6 +199,8 @@ function Level({
   setFoodLists,
   setFoodComboLists,
   setFilters,
+  upvoteCombo,
+  downvoteCombo,
 }) {
   const fieldRef = useRef(null);
 
@@ -252,7 +283,10 @@ function Level({
               <FoodItem
                 level={i}
                 food={food}
+                combo={combo}
                 foodComboList={foodComboLists[i]}
+                upvoteCombo={upvoteCombo}
+                downvoteCombo={downvoteCombo}
               />
             </div>
           ))}
@@ -311,7 +345,18 @@ function Level({
   );
 }
 
-function FoodItem({ level, food, foodComboList }) {
+function FoodItem({
+  level,
+  food,
+  combo,
+  foodComboList,
+  upvoteCombo,
+  downvoteCombo,
+}) {
+  const comboArr = [...combo, food];
+  const comboKey = comboArr.sort().join(" + ").toLowerCase();
+  const [upvotes, setUpvotes] = useState(localUpvotes[comboKey] || 0);
+  const [downvotes, setDownvotes] = useState(localDownvotes[comboKey] || 0);
   if (level === 0) {
     return <span className="more">{food}</span>;
   } else {
@@ -324,6 +369,36 @@ function FoodItem({ level, food, foodComboList }) {
           <>
             <span className={existsMore ? "more" : ""}>{food}</span>
             <span className="Description">
+              <span
+                className="Vote up"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  upvoteCombo(comboArr);
+                  if (comboKey in localUpvotes) {
+                    localUpvotes[comboKey]++;
+                  } else {
+                    localUpvotes[comboKey] = 1;
+                  }
+                  setUpvotes((votes) => votes + 1);
+                }}
+              >
+                {comboItem[0].upvotes + upvotes}
+              </span>
+              <span
+                className="Vote down"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downvoteCombo(comboArr);
+                  if (comboKey in localDownvotes) {
+                    localDownvotes[comboKey]++;
+                  } else {
+                    localDownvotes[comboKey] = 1;
+                  }
+                  setDownvotes((votes) => votes + 1);
+                }}
+              >
+                {comboItem[0].downvotes + downvotes}
+              </span>
               {comboItem[0].description ? (
                 <>
                   {comboItem[0].description}

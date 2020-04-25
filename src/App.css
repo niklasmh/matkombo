@@ -158,6 +158,34 @@ input::placeholder {
   text-transform: uppercase;
 }
 
+.Vote {
+  font-size: 16px;
+  padding: 2px 4px;
+  margin: 2px 4px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.Vote:hover {
+  background: #0008;
+}
+
+.Vote.up:before {
+  content: "▴ ";
+}
+
+.Vote.up {
+  color: lime;
+}
+
+.Vote.down:before {
+  content: "▾ ";
+}
+
+.Vote.down {
+  color: #ff0;
+}
+
 ::-webkit-scrollbar {
   width: 12px;
 }
